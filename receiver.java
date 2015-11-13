@@ -30,10 +30,11 @@ class receiver {
         PrintWriter fileWriter = new PrintWriter(fileName, "UTF-8");
         
         while(eot==false){
-        
+            System.out.println("Waiting for packet");
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length); //input packets
             udpSocketIn.receive(receivePacket);//receive packets from the emulator
             //now check out that packet
+            System.out.println("received a packet!");
             packet newPacket = null;
             try {
                 newPacket = newPacket.parseUDPdata(receiveData);

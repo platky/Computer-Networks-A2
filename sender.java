@@ -113,6 +113,7 @@ class sender {
             
             lPacket = listenPacket(udpSocketIn);
             if(lPacket!=null){
+                System.out.println("Received pack from listener");
                 //woo we got something back!
                 //lets get to work on it
                 //first check packet type
@@ -182,6 +183,7 @@ class sender {
     
     static public void sendPacket(int seq, String data, InetAddress address, DatagramSocket socket, int sendPort){
         try {
+            System.out.println("Sending packet "+seq);
             packet newPacket = packet.createPacket(seq,data); //create our packet
             //convert our data to a byte array
             byte byteData[] = newPacket.getUDPdata();
@@ -219,9 +221,7 @@ class sender {
         packet newPacket = null;
         
         try {
-            System.out.println("Started...");
             newPacket= future.get(50,TimeUnit.MILLISECONDS);
-            System.out.println("Finished...");
         
         } catch (Exception e){
             future.cancel(true);
@@ -242,7 +242,7 @@ class sender {
     
         @Override
         public packet call() throws Exception {
-            System.out.println("executable call is here");
+            System.out.println("Opening listener");
             
             byte[] receiveData = new byte[512];
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
