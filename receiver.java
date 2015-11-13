@@ -44,19 +44,23 @@ class receiver {
             if(newPacket !=null){
                 int curType = newPacket.getType();
                 int curSeq = newPacket.getSeqNum();
+                System.out.println("Seq given: "+curSeq+" expect seq: "+((seq+1)%32));
                 if(curSeq==(seq+1)%32){//this is the one!
                     seq=curSeq; //new recent packet num
                     if(curType==1){ //reg packet
+                        System.out.println("sending back an ACK");
                         sendAck(seq, udpSocketOut, IPAddress, ackPort);
                         //log the seq num
                         seqWriter.println(seq);
                         //also write the contents to file
                         fileWriter.print(newPacket.getData());
                     } else if(curType==2){//eot
+                        System.out.println("sending back an eot");
                         sendEot(seq, udpSocketOut, IPAddress, ackPort);
                         eot=true;
                     }
                 } else {
+                    System.out.println("not the expect packet. sending old ack: "+seq);
                     sendAck(seq, udpSocketOut, IPAddress, ackPort);//resend our most recent ack
                 }
             }
