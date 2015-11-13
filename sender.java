@@ -113,16 +113,18 @@ class sender {
             
             lPacket = listenPacket(udpSocketIn);
             if(lPacket!=null){
-                System.out.println("Received pack from listener");
+                System.out.println("Received packet from listener");
                 //woo we got something back!
                 //lets get to work on it
                 //first check packet type
                 if(lPacket.getType()==0) { //its an ACK!
                     //check its seq num
                     int thisSeq = lPacket.getSeqNum();
+                    System.out.println("Num was "+thisSeq);
                     //check if its within the proper window
                     if(windowCheck(base, N, thisSeq)){
-                        base= thisSeq;//if so then its our new base
+                        System.out.println("new base set");
+                        base= thisSeq+1;//if so then its our new base
                     }
                     ackWriter.println(thisSeq);
                 } else if(lPacket.getType()==2){//EOT

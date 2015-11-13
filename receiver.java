@@ -60,7 +60,7 @@ class receiver {
                         eot=true;
                     }
                 } else {
-                    System.out.println("not the expect packet. sending old ack: "+seq);
+                    System.out.println("not the expected packet. sending old ack: "+seq);
                     sendAck(seq, udpSocketOut, IPAddress, ackPort);//resend our most recent ack
                 }
             }
