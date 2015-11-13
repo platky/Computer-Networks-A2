@@ -72,7 +72,7 @@ class sender {
         timeOut = System.currentTimeMillis(); //adjust timer quickly for first run
         while(true){//indefinite while loop
             //First check if window is full
-            System.out.println("cur read length is "+curRead);
+            //System.out.println("cur read length is "+curRead);
             if(curRead<fileSize){//determine if we even need to send anything else
                 if(windowCheck(base, N,(seq+1)%32)){
                     //window is not full, safe to send packet
@@ -177,7 +177,7 @@ class sender {
         }
         
         String s = new String(content);
-        System.out.println("Content: "+s);
+        //System.out.println("Content: "+s);
         return s;
         
     }
@@ -254,6 +254,7 @@ class sender {
                 newPacket = newPacket.parseUDPdata(receiveData);
             } catch (Exception e){
                 //packet parsing exception
+                System.out.println("Error parsing packet: "+e);
             }
             return newPacket;
         }
