@@ -1,0 +1,37 @@
+//======README================
+
+Kyle Platt
+20423636
+
+Assignment 2
+CS456
+
+//============================
+
+To run this program you must first compile the .java files using
+make (seen below).
+
+On 3 different machines you will do the following:
+
+You then run the emulator (provided by school) by typing
+->	./nEmulator-linux386 9991 host2 9994 9993 host3 9992 1 0.2 0
+Feel free to change the ports but be consistent for all commands
+
+Now we run the data receiver by typing
+->	java receiver host1 9993 9994 <output File>
+
+Finally run the data sender
+-> 	java sender host1 9991 9992 <input file>
+
+*It is very important to run the sytem in this order and on
+seperate machines
+
+//============================
+
+This system was built and tested on all three student linux
+systems: ubuntu1204-002, ubuntu1204-004, and ubuntu1204-006
+
+//============================
+
+To compile this program simply run -> make
+It will compile using javac

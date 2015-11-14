@@ -14,7 +14,10 @@ import java.util.concurrent.TimeoutException;
 
 class sender { 
 
-    private static int maxSize =50;
+    private static int maxSize =500;
+
+	public static int base=0;
+	public static boolean eotReceived=false;
     
 	public static void main(String[] args) throws Exception{
 	    //Verify the 4 args first
@@ -28,12 +31,10 @@ class sender {
         String fileName = args[3];
         
         int N = 10; //window size
-        int base =0;
         int seq=-1;
         
         long timeOut =0;
         boolean eotSent = false;
-        boolean eotReceived = false;
         
         
         //open up the file
@@ -46,7 +47,7 @@ class sender {
         
         int packetsSize =(int)Math.ceil(fileSize/maxSize);
         String packets[]=new String[32]; //just hard code to 32
-        
+        //System.out.println("we will need "+packetsSize+" for a file of "+fileSize);
         try {
             fin = new FileInputStream(file);
             
@@ -66,21 +67,24 @@ class sender {
         
         DatagramSocket udpSocketIn = new DatagramSocket(ackPort);
         
-        packet lPacket = null;
+		//runs listener on a seperate thread
+		Multithread listener = new Multithread(udpSocketIn, ackWriter);
         
         //packet sending/receiving loop
         timeOut = System.currentTimeMillis(); //adjust timer quickly for first run
         while(true){//indefinite while loop
+
             //First check if window is full
-            //System.out.println("cur read length is "+curRead);
-            if(curRead<fileSize){//determine if we even need to send anything else
-                if(windowCheck(base, N,(seq+1)%32)){
+            //System.out.println("cur read length is "+curRead+" out of "+fileSize);
+            if(curRead<(int)fileSize){//determine if we even need to send anything else
+                            
+				if(windowCheck(base, N,(seq+1)%32)){
                     //window is not full, safe to send packet
                     //first determine sequence number
                     seq= (seq+1)%32;
                     //grab our data
-                    System.out.println("cur seq is "+seq);
-                    packets[seq] = fileReader(file, fin);
+                    //System.out.println("cur seq is "+seq);
+                    packets[seq] = fileReader(file, fin, curRead, (int)fileSize);
                     curRead+=maxSize; //adjust read buffer number
                     
                     //send our packet
@@ -91,58 +95,35 @@ class sender {
                 }
             } else {
                 //check if EOT was sent
-                int finalSpot = packetsSize % 32;
+				
+                int finalSpot = (packetsSize-1) % 32;
                 if (base==finalSpot){//only send it after receiving all acks (easier to manage this way)
-                if(eotSent==false){
-                    //then send one!
-                    sendEOT((seq+1)%32, IPAddress, udpSocketOut, dataPort);
-                    eotSent=true;
-                    seqWriter.println(seq);
-                }
+					//System.out.println("EOT check");                
+					if(eotSent==false){
+                    	//then send one!
+                    	sendEOT((base+1)%32, IPAddress, udpSocketOut, dataPort);
+                    	eotSent=true;
+						//System.out.println("EOT sent now");
+                    	seqWriter.println(seq);
+                	}
                 }
                 
             }
             //check for timeouts
-            if(timeOut+200<System.currentTimeMillis()){
-                //send the packet at base again
-                sendPacket(base, packets[base], IPAddress, udpSocketOut, dataPort);
-                timeOut= System.currentTimeMillis();
-                seqWriter.println(seq);
-            }
+			if(eotSent==false){
+            	if(timeOut+200<System.currentTimeMillis()){
+                	//send the packet at base again
+					//System.out.println("Got a time out");
+                	sendPacket((base+1)%32, packets[(base+1)%32], IPAddress, udpSocketOut, dataPort);
+                	timeOut= System.currentTimeMillis();
+                	seqWriter.println(seq);
+            	}
+			}
             
             
-            lPacket = listenPacket(udpSocketIn);
-            if(lPacket!=null){
-                System.out.println("Received packet from listener");
-                //woo we got something back!
-                //lets get to work on it
-                //first check packet type
-                if(lPacket.getType()==0) { //its an ACK!
-                    //check its seq num
-                    int thisSeq = lPacket.getSeqNum();
-                    System.out.println("Num was "+thisSeq);
-                    //check if its within the proper window
-                    if(windowCheck(base, N, thisSeq)){
-                        System.out.println("new base set");
-                        base= thisSeq+1;//if so then its our new base
-                    }
-                    ackWriter.println(thisSeq);
-                } else if(lPacket.getType()==2){//EOT
-                    eotReceived=true;
-                }
-            }
             
             if(eotReceived==true){
-                //check if we have acks for all!
-                int finalSpot = packetsSize % 32;
-                if (base==finalSpot){
-                    //a surprisingly easy solution to this. We can pre calculate what
-                    //the final seq number will be based on file size which we did at the
-                    //start. Even though we have wrapping seq numbers, the EOT wont be sent
-                    //until we are on our final wrap meaning the overlaps dont 
-                    //actually matter
-                    break;
-                }
+            	break;
             }
             
             
@@ -167,8 +148,16 @@ class sender {
     //This file reader does in fact keep track of position in file since it is
     //a stream. Very handy for this as we just take 500 or less bytes at a time
     //to send
-    public static String fileReader (File file, FileInputStream fin) {
-        byte content[] = new byte[maxSize];
+    public static String fileReader (File file, FileInputStream fin, int curRead, int totalRead) {
+        byte content[] = null;
+		//we dont want extra bytes in our byte array because they result in corrupted end files
+		//only send exactly what we need and no more
+		if(curRead+maxSize<=totalRead){
+			content =new byte[maxSize];
+		} else {
+			int size = totalRead-curRead;
+			content= new byte[size];
+		}
         try {
             fin.read(content);
         } catch (IOException e){
@@ -185,7 +174,7 @@ class sender {
     
     static public void sendPacket(int seq, String data, InetAddress address, DatagramSocket socket, int sendPort){
         try {
-            System.out.println("Sending packet "+seq);
+            //System.out.println("Sending packet "+seq);
             packet newPacket = packet.createPacket(seq,data); //create our packet
             //convert our data to a byte array
             byte byteData[] = newPacket.getUDPdata();
@@ -202,6 +191,7 @@ class sender {
     
     static public void sendEOT(int seq, InetAddress address, DatagramSocket socket, int sendPort){
         try {
+			//System.out.println("Sending an EOT: "+seq);
             packet newPacket = packet.createEOT(seq); //create our packet
             //convert our data to a byte array
             byte byteData[] = newPacket.getUDPdata();
@@ -209,56 +199,56 @@ class sender {
             //send it
             DatagramPacket sendPacket = new DatagramPacket(byteData, byteData.length, address, sendPort);
             socket.send(sendPacket);
-            
+            //System.out.println("EOT sent");
         } catch (Exception e){
             System.out.println("Error sending packet "+e);
         }
         
     }
     
-    static public packet listenPacket(DatagramSocket socket){
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<packet> future = executor.submit(new Task(socket));
-        
-        packet newPacket = null;
-        
-        try {
-            newPacket= future.get(50,TimeUnit.MILLISECONDS);
-        
-        } catch (Exception e){
-            future.cancel(true);
-            //System.out.println("Terminated: "+e);
-        }
-        
-        executor.shutdownNow();
-        return newPacket;
-    }
-    
-    static class Task implements Callable<packet> {
-        private DatagramSocket socket;
-        
-        
-        public Task(DatagramSocket givenSocket){
-            this.socket=givenSocket;
-        }
-    
-        @Override
-        public packet call() throws Exception {
-            System.out.println("Opening listener");
-            
-            byte[] receiveData = new byte[512];
-            DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-            socket.receive(receivePacket);
-            packet newPacket=null;
-            try {
-                newPacket = newPacket.parseUDPdata(receiveData);
-            } catch (Exception e){
-                //packet parsing exception
-                System.out.println("Error parsing packet: "+e);
-            }
-            return newPacket;
-        }
-    }
+
+
+	static class Multithread implements Runnable {
+
+		private Thread curThread;
+		private DatagramSocket socket;
+		private PrintWriter writer;
+
+		Multithread(DatagramSocket socket, PrintWriter writer) {
+			this.curThread = new Thread(this, "Port Listening Thread");
+			//System.out.println("listening thread was created: "+curThread);
+			this.socket=socket;
+			this.writer=writer;
+			curThread.start();
+		}
+
+		public void run() {
+            //System.out.println("Opening listener");
+            while(eotReceived==false){
+            	byte[] receiveData = new byte[512];
+            	DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+				try {
+					this.socket.receive(receivePacket);
+					packet lPacket=null;
+					lPacket = lPacket.parseUDPdata(receiveData);
+					if(lPacket.getType()==0){
+						setBase(lPacket.getSeqNum());
+					} else if(lPacket.getType()==2){
+						eotReceived=true;
+					}
+					this.writer.println(lPacket.getSeqNum());
+				} catch (Exception e) {
+					System.out.println("Listener exception: "+e);
+				}
+			}
+		}
+
+	}
+
+	public static void setBase(int seq) {
+		//System.out.println("Setting the base to: "+seq);
+		base=seq;
+	}
     
     public static boolean windowCheck(int base, int N, int seq) {
         //quick function to deal with the window wrapping since seq

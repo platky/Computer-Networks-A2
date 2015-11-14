@@ -30,11 +30,11 @@ class receiver {
         PrintWriter fileWriter = new PrintWriter(fileName, "UTF-8");
         
         while(eot==false){
-            System.out.println("Waiting for packet");
+            //System.out.println("Waiting for packet");
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length); //input packets
             udpSocketIn.receive(receivePacket);//receive packets from the emulator
             //now check out that packet
-            System.out.println("received a packet!");
+            //System.out.println("received a packet!");
             packet newPacket = null;
             try {
                 newPacket = newPacket.parseUDPdata(receiveData);
@@ -44,23 +44,28 @@ class receiver {
             if(newPacket !=null){
                 int curType = newPacket.getType();
                 int curSeq = newPacket.getSeqNum();
-                System.out.println("Seq given: "+curSeq+" expect seq: "+((seq+1)%32));
+                //System.out.println("Seq given: "+curSeq+" expected seq: "+((seq+1)%32));
                 if(curSeq==(seq+1)%32){//this is the one!
                     seq=curSeq; //new recent packet num
                     if(curType==1){ //reg packet
-                        System.out.println("sending back an ACK");
+                        //System.out.println("sending back an ACK");
                         sendAck(seq, udpSocketOut, IPAddress, ackPort);
                         //log the seq num
                         seqWriter.println(seq);
                         //also write the contents to file
-                        fileWriter.print(newPacket.getData());
+						String content = new String(newPacket.getData());
+						//System.out.println("Data length was "+newPacket.getLength());
+						//System.out.println("Content: "+content);
+                        fileWriter.print(content);
+						fileWriter.flush();
                     } else if(curType==2){//eot
-                        System.out.println("sending back an eot");
+                        //System.out.println("sending back an eot");
                         sendEot(seq, udpSocketOut, IPAddress, ackPort);
                         eot=true;
+						
                     }
                 } else {
-                    System.out.println("not the expected packet. sending old ack: "+seq);
+                    //System.out.println("not the expected packet. sending old ack: "+seq);
                     sendAck(seq, udpSocketOut, IPAddress, ackPort);//resend our most recent ack
                 }
             }
@@ -77,6 +82,7 @@ class receiver {
 	
 	public static void sendAck(int seq, DatagramSocket socket, InetAddress address, int port){
 	    try {
+			//System.out.println("Inside ack sender with seq "+seq);
             packet newPacket = packet.createACK(seq); //create our packet
             //convert our data to a byte array
             byte byteData[] = newPacket.getUDPdata();
@@ -92,6 +98,7 @@ class receiver {
 	
 	public static void sendEot(int seq, DatagramSocket socket, InetAddress address, int port){
 	    try {
+			//System.out.println("Sending EOT");
             packet newPacket = packet.createEOT(seq); //create our packet
             //convert our data to a byte array
             byte byteData[] = newPacket.getUDPdata();
@@ -99,7 +106,7 @@ class receiver {
             //send it
             DatagramPacket sendPacket = new DatagramPacket(byteData, byteData.length, address, port);
             socket.send(sendPacket);
-            
+            //System.out.println("EOT now sent");
         } catch (Exception e){
             System.out.println("Error sending packet "+e);
         }    
